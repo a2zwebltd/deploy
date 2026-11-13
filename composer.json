@@ -1,0 +1,14 @@
+{
+    "name": "a2zwebltd/deploy",
+    "description": "Trigger a GitHub Actions deploy workflow from your machine and wait for it to finish.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["deploy", "github-actions", "docker"],
+    "authors": [
+        {
+            "name": "A2Z WEB",
+            "homepage": "https://a2zweb.co/"
+        }
+    ],
+    "bin": ["bin/deploy"]
+}

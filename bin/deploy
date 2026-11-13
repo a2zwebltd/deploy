@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# Trigger a GitHub Actions deploy workflow and wait for it to finish.
+#
+#   deploy [branch] [workflow]      # defaults: master dockerize.yml
+#
+# Exits non-zero (printing the failed steps' log) if any job fails.
+# Requires: git, gh (authenticated via `gh auth login`).
+
+set -euo pipefail
+
+BRANCH=${1:-master}
+WORKFLOW=${2:-dockerize.yml}
+
+# The workflow builds what's on GitHub, not your working copy.
+git fetch --quiet origin "$BRANCH"
+if [ "$(git rev-parse "$BRANCH")" != "$(git rev-parse "origin/$BRANCH")" ]; then
+    echo "Local $BRANCH differs from origin/$BRANCH — push (or pull) first." >&2
+    exit 1
+fi
+
+echo "Deploying $(git log -1 --format='%h %s' "origin/$BRANCH")"
+
+out=$(gh workflow run "$WORKFLOW" --ref "$BRANCH" 2>&1)
+run_id=$(grep -oE '/runs/[0-9]+' <<<"$out" | grep -oE '[0-9]+$' || true)
+
+if [ -z "$run_id" ]; then
+    echo "Could not read the run ID from gh output:" >&2
+    echo "$out" >&2
+    exit 1
+fi
+
+echo "Run: $(grep -oE 'https://[^ ]+/runs/[0-9]+' <<<"$out")"
+
+# Waits for every job in the run; non-zero if any fails.
+if ! gh run watch "$run_id" --exit-status; then
+    echo >&2
+    echo "Deployment failed — log of the failed step(s):" >&2
+    gh run view "$run_id" --log-failed >&2
+    exit 1
+fi
+
+echo "Deployed."
