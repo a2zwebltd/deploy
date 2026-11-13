@@ -1,0 +1,29 @@
+name: Setup Coolify CLI
+description: Install coolify-cli and configure it as the default context.
+
+inputs:
+  coolify-url:
+    description: Coolify instance URL, e.g. https://coolify.example.com
+    required: true
+  coolify-token:
+    description: Coolify API token
+    required: true
+  cli-version:
+    description: coolify-cli version
+    default: 1.11.0
+
+runs:
+  using: composite
+  steps:
+    - name: Install Coolify CLI
+      shell: bash
+      env:
+        VERSION: ${{ inputs.cli-version }}
+      run: curl -fsSL "https://github.com/coollabsio/coolify-cli/releases/download/v${VERSION}/coolify-cli_${VERSION}_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin coolify
+
+    - name: Configure Coolify context
+      shell: bash
+      env:
+        URL: ${{ inputs.coolify-url }}
+        TOKEN: ${{ inputs.coolify-token }}
+      run: coolify context add ci "$URL" "$TOKEN" --default

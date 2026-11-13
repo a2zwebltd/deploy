@@ -1,0 +1,49 @@
+name: Coolify deploy
+description: Deploy a Coolify resource, stream its deployment log, and fail unless it finishes (healthy). Run setup-coolify first.
+
+inputs:
+  resource:
+    description: Coolify resource (application) name
+    required: true
+  runtime-log-lines:
+    description: Runtime log lines to print after the deployment
+    default: '200'
+
+runs:
+  using: composite
+  steps:
+    # Coolify waits for the image's HEALTHCHECK, so "finished" means healthy.
+    - name: Deploy and wait until healthy
+      shell: bash
+      env:
+        RESOURCE: ${{ inputs.resource }}
+        LINES: ${{ inputs.runtime-log-lines }}
+      run: |
+        APP=$(coolify app list --format json | jq -er --arg n "$RESOURCE" '.[] | select(.name == $n) | .uuid')
+
+        DEPLOYMENT=$(coolify deploy name "$RESOURCE" --format json | jq -er '.deployments[0].deployment_uuid')
+        echo "Deployment: $DEPLOYMENT"
+
+        # `logs --follow` never exits (coolify-cli 1.11.0), so poll and print only new lines.
+        echo "::group::Deployment log"
+        SEEN=0
+        while true; do
+          STATUS=$(coolify deploy get "$DEPLOYMENT" --format json | jq -r '.status')
+          LOG=$(coolify app deployments logs "$APP" "$DEPLOYMENT" -n 0 2>/dev/null || true)
+          if [ -n "$LOG" ]; then
+            printf '%s\n' "$LOG" | tail -n +$((SEEN + 1))
+            SEEN=$(printf '%s\n' "$LOG" | wc -l)
+          fi
+          case "$STATUS" in
+            finished|failed|cancelled-by-user) break ;;
+          esac
+          sleep 5
+        done
+        echo "::endgroup::"
+
+        echo "::group::Runtime log (last $LINES lines)"
+        coolify app logs "$APP" -n "$LINES" || true
+        echo "::endgroup::"
+
+        echo "Deployment $STATUS"
+        [ "$STATUS" = finished ]

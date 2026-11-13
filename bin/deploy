@@ -2,7 +2,7 @@
 #
 # Trigger a GitHub Actions deploy workflow and wait for it to finish.
 #
-#   deploy [branch] [workflow]      # defaults: master dockerize.yml
+#   deploy [branch] [workflow]      # defaults: master deploy.yml
 #
 # Exits non-zero (printing the failed steps' log) if any job fails.
 # Requires: git, gh (authenticated via `gh auth login`).
@@ -10,7 +10,7 @@
 set -euo pipefail
 
 BRANCH=${1:-master}
-WORKFLOW=${2:-dockerize.yml}
+WORKFLOW=${2:-deploy.yml}
 
 # The workflow builds what's on GitHub, not your working copy.
 git fetch --quiet origin "$BRANCH"
