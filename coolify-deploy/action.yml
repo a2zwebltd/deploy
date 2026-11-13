@@ -5,9 +5,6 @@ inputs:
   resource:
     description: Coolify resource (application) name
     required: true
-  image-digest:
-    description: Image digest to deploy (sha256:...), e.g. docker/build-push-action's `digest` output. Pins the app to it; empty keeps the app's current tag.
-    default: ''
   runtime-log-lines:
     description: Runtime log lines to print after the deployment
     default: '200'
@@ -19,15 +16,9 @@ runs:
       shell: bash
       env:
         RESOURCE: ${{ inputs.resource }}
-        DIGEST: ${{ inputs.image-digest }}
         LINES: ${{ inputs.runtime-log-lines }}
       run: |
         APP=$(coolify app list --format json | jq -er --arg n "$RESOURCE" '.[] | select(.name == $n) | .uuid')
-
-        if [ -n "$DIGEST" ]; then
-          echo "Pinning $RESOURCE to $DIGEST"
-          coolify app update "$APP" --docker-tag "sha256-${DIGEST#sha256:}"
-        fi
 
         DEPLOYMENT=$(coolify deploy name "$RESOURCE" --format json | jq -er '.deployments[0].deployment_uuid')
         echo "Deployment: $DEPLOYMENT"

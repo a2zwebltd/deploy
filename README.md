@@ -42,8 +42,6 @@ Two composite actions for the workflow side:
 - `setup-coolify` installs coolify-cli and points it at your Coolify instance.
 - `coolify-deploy` deploys a resource, streams the deployment log, prints the runtime log, and fails unless the deployment finishes. Coolify waits for the image's `HEALTHCHECK`, so a finished deployment means a healthy container.
 
-Pass `image-digest` and the action pins the Coolify app to that exact image (`image@sha256:…`) before deploying, so any branch can go to any environment and restarts stay on the same image. To roll back, deploy again with an older digest.
-
 Each GitHub environment holds the Coolify app it deploys to (`COOLIFY_RESOURCE`):
 
 ```yaml
@@ -58,12 +56,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
     steps:
       # ... checkout, registry login ...
-      - id: build
-        uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@v7
         with:
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
@@ -75,17 +70,16 @@ jobs:
     environment: ${{ inputs.environment }}
     concurrency: deploy-${{ inputs.environment }}
     steps:
-      - uses: a2zwebltd/deploy/setup-coolify@v2.0.0
+      - uses: a2zwebltd/deploy/setup-coolify@v1.3.0
         with:
           coolify-url: ${{ vars.COOLIFY_URL }}
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
           # cli-version: 1.11.0
 
-      - uses: a2zwebltd/deploy/coolify-deploy@v2.0.0
+      - uses: a2zwebltd/deploy/coolify-deploy@v1.3.0
         with:
           resource: ${{ vars.COOLIFY_RESOURCE }}   # Coolify application name
-          image-digest: ${{ needs.build.outputs.digest }}
           # runtime-log-lines: 200
 ```
 
-The Coolify app must use the same image name the workflow pushes (its tag is overwritten with the digest).
+The deploy runs whatever image tag the Coolify app is configured to pull. The workflow above pushes `:<branch>`, so deploy the branch whose tag the environment's app pulls (e.g. `master` → production).
