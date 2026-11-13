@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 #
-# Trigger a GitHub Actions deploy workflow and wait for it to finish.
+# Deploy the current git branch to an environment by dispatching a GitHub
+# Actions workflow, then wait for it to finish.
 #
-#   deploy [branch] [workflow]      # defaults: master deploy.yml
+#   deploy [environment] [workflow]    # defaults: production deploy.yml
 #
+# The workflow must accept an `environment` workflow_dispatch input.
 # Exits non-zero (printing the failed steps' log) if any job fails.
 # Requires: git, gh (authenticated via `gh auth login`).
 
 set -euo pipefail
 
-BRANCH=${1:-master}
+ENVIRONMENT=${1:-production}
 WORKFLOW=${2:-deploy.yml}
+
+BRANCH=$(git symbolic-ref --short -q HEAD) || {
+    echo "Detached HEAD — check out a branch first." >&2
+    exit 1
+}
 
 # The workflow builds what's on GitHub, not your working copy.
 git fetch --quiet origin "$BRANCH"
@@ -19,9 +26,9 @@ if [ "$(git rev-parse "$BRANCH")" != "$(git rev-parse "origin/$BRANCH")" ]; then
     exit 1
 fi
 
-echo "Deploying $(git log -1 --format='%h %s' "origin/$BRANCH")"
+echo "Deploying $BRANCH ($(git log -1 --format='%h %s' "origin/$BRANCH")) to $ENVIRONMENT"
 
-out=$(gh workflow run "$WORKFLOW" --ref "$BRANCH" 2>&1)
+out=$(gh workflow run "$WORKFLOW" --ref "$BRANCH" -f environment="$ENVIRONMENT" 2>&1)
 run_id=$(grep -oE '/runs/[0-9]+' <<<"$out" | grep -oE '[0-9]+$' || true)
 
 if [ -z "$run_id" ]; then
